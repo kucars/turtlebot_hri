@@ -1,0 +1,14 @@
+#goal definition
+string order
+string name
+uint32 num_of_samples
+---
+#result definition
+string order
+string name
+uint32 num_of_samples
+---
+#feedback definition
+string order
+string[] name
+float32[] confidence
