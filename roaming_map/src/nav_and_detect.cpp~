@@ -37,6 +37,10 @@ public:
    //subscriber callback function. it takes care of goal sending, and stopping when a face is detected.
    void motionCallback(const face_dr::motion_msgConstPtr& msg)
    {    
+      ROS_INFO("pgi = %d", prev_goal_id);
+      ROS_INFO("ngi = %d", next_goal_id);
+      ROS_INFO("%s", (mc.isServerConnected() ? "true" : "false"));
+
       if (msg->order == "MOVE")
       {
 	 if (next_goal_id != prev_goal_id)

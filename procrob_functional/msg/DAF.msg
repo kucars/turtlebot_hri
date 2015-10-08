@@ -1,1 +1,0 @@
-string detected_a_face
