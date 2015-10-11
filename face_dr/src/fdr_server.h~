@@ -14,7 +14,7 @@ Copyright 2015 Alaa El Khatib.
     Lesser GNU General Public License for more details.
 
     You should have received a copy of the Lesser GNU General Public License
-    along with face_dr.  If not, see <http://www.gnu.org/licenses/>.
+    along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
 
 
 Face detection and recognition ROS actionlib server.
