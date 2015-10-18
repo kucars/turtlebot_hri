@@ -45,20 +45,14 @@ The code below is inspired by, builds upon, and/or uses code from the following 
 
 typedef actionlib::SimpleActionClient<face_dr::fdrAction> FDR_CLIENT;
 typedef const actionlib::SimpleClientGoalState& AC_GOAL_STATE;
-typedef const face_dr::fdrResultConstPtr& FDR_ACTION_RESULT;
-typedef const face_dr::fdrFeedbackConstPtr& FDR_ACTION_FEEDBACK;
-typedef const face_dr::fdr_msgConstPtr& FDR_ORDER;
+typedef const face_dr::fdrResultConstPtr& FDR_ACTION_RESULT_Ptr;
+typedef const face_dr::fdrFeedbackConstPtr& FDR_ACTION_FEEDBACK_Ptr;
+typedef const face_dr::fdr_msgConstPtr& FDR_ORDER_Ptr;
 
 
 
 class FDRClient
 {
-
-   std::string DETECT_m1;
-   std::string DETECT_m2;
-   std::string TRAIN_m1;
-   std::string RECOGNIZE_m1;
-   std::string RECOGNIZE_m2;
    ros::NodeHandle nh;
    FDR_CLIENT fdr_ac;
    ros::Subscriber fdr_order_sub;
@@ -72,9 +66,9 @@ public:
 
    FDRClient();
    void active_cb();
-   void done_cb(AC_GOAL_STATE, FDR_ACTION_RESULT);
-   void feedback_cb(FDR_ACTION_FEEDBACK);
-   void sub_cb(FDR_ORDER);
+   void done_cb(AC_GOAL_STATE, FDR_ACTION_RESULT_Ptr);
+   void feedback_cb(FDR_ACTION_FEEDBACK_Ptr);
+   void sub_cb(FDR_ORDER_Ptr);
    
 };
 

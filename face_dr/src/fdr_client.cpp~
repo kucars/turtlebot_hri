@@ -98,7 +98,7 @@ void FDRClient::feedback_cb(FDR_ACTION_FEEDBACK_Ptr feedback)
          else
          {
             if (feedback->confidence < 0)
-               ROS_INFO("%s was recognized using the color of his/her shirt, based on samples accumulated between %s and %s", (feedback->name).c_str(), (feedback->time_first).c_str(), (feedback->time_last).c_str());
+               ROS_INFO("%s", (feedback->name).c_str());
             else
                ROS_INFO("%s was recognized with confidence %f", (feedback->name).c_str(), feedback->confidence);
 

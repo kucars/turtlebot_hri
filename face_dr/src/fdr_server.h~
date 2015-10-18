@@ -52,7 +52,6 @@ The code below is inspired by, builds upon, and/or uses code from the following 
 #ifndef FDR_SERVER_H
 #define FDR_SERVER_H
 
-#include <vector>
 #include "ros/ros.h"
 #include "actionlib/server/simple_action_server.h"
 #include "image_transport/image_transport.h"
@@ -61,8 +60,7 @@ The code below is inspired by, builds upon, and/or uses code from the following 
 #include "opencv2/highgui/highgui.hpp"
 #include "face_dr/fdrAction.h"
 #include "sensor_msgs/image_encodings.h"
-
-#include <sstream>
+#include "opencv2/ml/ml.hpp"
 #include "cv_bridge/cv_bridge.h"
 
 typedef actionlib::SimpleActionServer<face_dr::fdrAction> FDR_SERVER;
@@ -70,14 +68,26 @@ typedef face_dr::fdrFeedback FDR_FEEDBACK;
 typedef face_dr::fdrResult FDR_RESULT;
 typedef face_dr::fdrGoalConstPtr FDR_GOAL_Ptr;
 
-std::string CSV_FILE = "/home/alaa/ros_data/face_images/faces_csv.txt";
-std::string FACE_IMAGES_FILE = "/home/alaa/ros_data/face_images/";
-std::string UB_IMAGES_FILE = "/home/alaa/ros_data/upper_body/";
-std::string HAAR_CASCADE_FILE = "/home/alaa/ros_data/haarcascade_frontalface_alt.xml";
-std::string LBP_CASCADE_FILE = "/home/alaa/ros_data/lbpcascade_frontalface.xml";
-std::string UB_CASCADE_FILE = "/home/alaa/ros_data/haarcascade_upperbody.xml";
-std::string PCA_MODEL_FILE = "/home/alaa/ros_data/face_images/pca_model.yml";
-std::string LABEL_TO_NAME_FILE = "/home/alaa/ros_data/face_images/label_to_name.txt";
+//define paths to folders
+std::string ROS_DATA = "/home/alaa/ros_data/";
+std::string FACE_FOLDER = ROS_DATA + "face_images/";
+std::string FACE_IMGS_FOLDER = FACE_FOLDER + "face_images/";
+std::string U_BODY_FOLDER = ROS_DATA + "upper_body/";
+std::string HUE_HISTS_FOLDER = U_BODY_FOLDER + "hue_hists/";
+std::string DRESS_COLOR_IMGS_FOLDER = U_BODY_FOLDER + "dc_images/";
+
+//define paths to files
+std::string FACE_CSV = FACE_FOLDER + "faces_csv.txt";
+std::string FACE_HAAR_DETECTOR = FACE_FOLDER + "haarcascade_frontalface_alt.xml";
+std::string FACE_LBP_DETECTOR = FACE_FOLDER + "lbpcascade_frontalface.xml";
+std::string FACE_PCA_RECOGINZER = FACE_FOLDER + "pca_model.yml";
+std::string FACE_NAMES = FACE_FOLDER + "class_names.txt";
+
+std::string U_BODY_HAAR_DETECTOR = U_BODY_FOLDER + "haarcascade_upperbody.xml";
+std::string COLOR_CLASSIFIER = U_BODY_FOLDER + "color_classifier.yml";
+std::string U_BODY_NAMES = U_BODY_FOLDER + "class_names.txt";
+
+//define face recognizer parameters
 int PCA_DIM = 30;
 int PCA_THRSH = 8000;
 
@@ -92,15 +102,11 @@ class FDRServer
    FDR_RESULT fdr_result;
    FDR_GOAL_Ptr fdr_goal;
    int counter_1;
-   cv::CascadeClassifier face_cascade_1;
-   cv::CascadeClassifier face_cascade_2;
-   cv::CascadeClassifier face_cascade;
-   cv::CascadeClassifier ub_cascade;
-   std::string DETECT_m1;
-   std::string DETECT_m2;
-   std::string TRAIN_m1;
-   std::string RECOGNIZE_m1;
-   std::string RECOGNIZE_m2;
+   cv::CascadeClassifier face_cascade_1; //loads Haar
+   cv::CascadeClassifier face_cascade_2; //laods LBP
+   cv::CascadeClassifier face_cascade; //uses either Haar or LBP
+   cv::CascadeClassifier ub_cascade; //loads Haar
+
 
 public:
    
@@ -110,13 +116,5 @@ public:
    void procCB(const sensor_msgs::ImageConstPtr&);
    
 };
-
-std::vector<cv::Rect> detect_faces_cascade(const cv::Mat&, cv::CascadeClassifier);
-
-void read_csv(const std::string&, std::vector<cv::Mat>&, std::vector<int>&, std::vector<std::string>&, char separator = ';');
-
-std::vector<cv::Rect> detect_ubs_cascade(const cv::Mat&, cv::CascadeClassifier);
-
-void calc_hist(const cv::Mat&, cv::Mat&);
 
 #endif

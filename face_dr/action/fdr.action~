@@ -12,5 +12,3 @@ uint32 num_of_samples
 string order
 string name
 float32 confidence
-string time_first
-string time_last
