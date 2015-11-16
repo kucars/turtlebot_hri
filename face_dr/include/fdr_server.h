@@ -74,7 +74,7 @@ typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sens
 
 /*
 Define paths to folders and files.
-Make sure to have the following file heirarchy EXACTLY:
+Make sure to have the following file hierarchy EXACTLY:
 
 ..
 └── ros_data
