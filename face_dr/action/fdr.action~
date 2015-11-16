@@ -14,4 +14,4 @@ string name
 float32 depth
 float32 xmidpt
 string result
-float32 time_seen
+time time_seen

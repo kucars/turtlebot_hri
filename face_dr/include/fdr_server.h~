@@ -1,6 +1,6 @@
 /*
 
-Copyright 2015.
+Copyright 2015 Alaa El Khatib.
 
     This file is part of the face_dr ROS package.
 
@@ -17,8 +17,11 @@ Copyright 2015.
     along with face_dr.  If not, see <http://www.gnu.org/licenses/>.
 
 
+Face detection and recognition ROS actionlib server.
+Subscribes to: an /usb_cam/image_raw through an ImageTransport class.
+
 Author: Alaa El Khatib
-Last updated: 16.11.2015
+Last updated: 08.10.2015
 
 The code below is inspired by, builds upon, and/or uses code from the following source(s):
 
@@ -72,26 +75,7 @@ typedef face_dr::fdrGoalConstPtr FDR_GOAL_Ptr;
 
 typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> img_sync_policy;
 
-/*
-Define paths to folders and files.
-Make sure to have the following file heirarchy EXACTLY:
-
-..
-└── ros_data
-    ├── faces
-    │   ├── face_images
-    │   ├── haarcascade_frontalface_alt.xml
-    │   └── lbpcascade_frontalface.xml
-    └── upper_body
-        ├── dc_images
-        ├── haarcascade_upperbody.xml
-        └── hue_hists
-        
-If you delete any training data from the folders, restore to the above.
-DO NOT delete individual training images; delete the entire folder that is generated for each person.
-If you delete stuff, re-train.    
-*/
-
+//define paths to folders
 const std::string ROS_DATA = "/home/alaa/ros_data/";
 const std::string FACE_FOLDER = ROS_DATA + "faces/";
 const std::string FACE_IMGS_FOLDER = FACE_FOLDER + "face_images/";
@@ -99,7 +83,7 @@ const std::string U_BODY_FOLDER = ROS_DATA + "upper_body/";
 const std::string HUE_HISTS_FOLDER = U_BODY_FOLDER + "hue_hists/";
 const std::string DRESS_COLOR_IMGS_FOLDER = U_BODY_FOLDER + "dc_images/";
 
-
+//define paths to files
 const std::string FACE_CSV = FACE_FOLDER + "faces_csv.txt";
 const std::string FACE_HAAR_DETECTOR = FACE_FOLDER + "haarcascade_frontalface_alt.xml";
 const std::string FACE_LBP_DETECTOR = FACE_FOLDER + "lbpcascade_frontalface.xml";
@@ -145,7 +129,7 @@ class FDRServer
 
 public:
    
-   FDRServer(std::string, std::string, std::string);
+   FDRServer(std::string, std::string);
    void goalCB();
    void preemptCB();
    void face_cb(const sensor_msgs::ImageConstPtr& rgb_img_ptr, const sensor_msgs::ImageConstPtr& depth_img_ptr);

@@ -33,6 +33,7 @@ The code below is inspired by, builds upon, and/or uses code from the following 
 #include "actionlib/client/simple_action_client.h"
 #include "sound_play/sound_play.h"
 #include "face_dr/fdr_msg.h"
+#include "face_dr/motion_msg.h"
 #include "face_dr/fdrAction.h"
 #include "move_base_msgs/MoveBaseAction.h"
 #include "pcl_ros/point_cloud.h"

@@ -7,43 +7,20 @@
 #include "opencv2/contrib/contrib.hpp"
 
 
-
-std::vector<cv::Rect> detect_faces_cascade(const cv::Mat& frame, cv::CascadeClassifier face_cascade)
-{
-    std::vector<cv::Rect> faces;
-    cv::Mat frame_gray;
-
-    cvtColor(frame, frame_gray, CV_BGR2GRAY);
-    equalizeHist(frame_gray, frame_gray);
-
-    face_cascade.detectMultiScale(frame_gray, faces, 1.1, 5, 0, cv::Size(64, 64));
-
-    return faces;
-}
-
-
 void calc_hist(const cv::Mat& dc_img, cv::Mat& hue_hist)
 {
    cv::Mat hsv_img;
    cvtColor(dc_img, hsv_img, CV_BGR2HSV);
    std::vector<cv::Mat> hsv_planes;
    cv::split( hsv_img, hsv_planes );
-
+   float norm_factor = hsv_img.total();
    int histSize = 256;
 
    float range[] = { 0, 256 } ;
    const float* histRange = { range };
-
-   bool uniform = true; bool accumulate = false;
-
-   cv::calcHist(&hsv_planes[0], 1, 0, cv::Mat(), hue_hist, 1, &histSize, &histRange, uniform, accumulate);
-
-   int hist_w = 512; int hist_h = 400;
-   int bin_w = cvRound((double) hist_w/histSize);
-
-   cv::Mat histImage(hist_h, hist_w, CV_8UC3, cv::Scalar( 0,0,0));
-
-   cv::normalize(hue_hist, hue_hist, 0, histImage.rows, cv::NORM_MINMAX, -1, cv::Mat() );
+   cv::calcHist(&hsv_planes[0], 1, 0, cv::Mat(), hue_hist, 1, &histSize, &histRange, true, false);
+   for (int k = 0; k < 256; k++)
+	   hue_hist.at<float>(k) = 100.0f * hue_hist.at<float>(k) / norm_factor;
 }
 
 
@@ -57,17 +34,20 @@ void read_ub_yml(std::string hists_path, std::string dc_imgs_folder, cv::Mat& tr
       {
 	 std::string name = dir_iter->path().filename().native();
 	 int dir_count = count_files(dc_imgs_folder + name);
-         for (int i = 0; i < dir_count; i++)
+	 if (dir_count >= min_train_data)
          {
-            cv::Mat tmp(256, 1, CV_32F);
-            std::string node = "Hue Histogram "+std::to_string(i + 1);
-	    read_yaml<cv::Mat>(hists_path + name, "/dc_log.yml", node, tmp);
-            if (trainingData.empty()) trainingData.push_back(tmp);
-            else cv::hconcat(trainingData, tmp, trainingData);
-            responseData.push_back(outer_counter);
+	         for (int i = 0; i < dir_count; i++)
+	         {
+       		    cv::Mat tmp(256, 1, CV_32F);
+        	    std::string node = "Hue Histogram "+std::to_string(i + 1);
+			    read_yaml<cv::Mat>(hists_path + name, "/dc_log.yml", node, tmp);
+       		    if (trainingData.empty()) trainingData.push_back(tmp);
+        	    else cv::hconcat(trainingData, tmp, trainingData);
+        	    responseData.push_back(outer_counter);
+        	 }
+	         outer_counter++;
+         	 label_to_ub_name.push_back(name);
          }
-         outer_counter++;
-         label_to_ub_name.push_back(name);
       }
    }
 }
@@ -147,7 +127,7 @@ void read_vector(std::string pathname, std::vector<std::string>& vec)
 }
 
 
-cv::Mat extract_dress_color(const cv::Rect& upper_body_rect, const cv::Mat& original_img)
+cv::Rect extract_dress_area(const cv::Rect& upper_body_rect)
 {
 	double dcx = upper_body_rect.x + upper_body_rect.width*0.3;
 	double dcy = upper_body_rect.y + upper_body_rect.height*0.7;
@@ -155,7 +135,7 @@ cv::Mat extract_dress_color(const cv::Rect& upper_body_rect, const cv::Mat& orig
 	double dcheight = upper_body_rect.height*0.3;
 	cv::Rect dc_rect(dcx, dcy, dcwidth, dcheight);
 
-	return original_img(dc_rect);
+	return dc_rect;
 }
 
 
@@ -178,15 +158,72 @@ void append_to_yaml(std::string folder, std::string name, cv::Mat hist, int coun
 	fs.release();
 }
 
-void write_yaml(std::string folder, std::string file, std::string node, std::string value)
+
+void save_avg_hists(const cv::Mat& trainingData, const cv::Mat& responseData, std::vector<std::string> label_to_name, std::string save_file)
 {
-	using namespace boost::filesystem;
-	path folder_path(folder);
-	if (!(exists(folder_path) && is_directory(folder_path)))
-	   create_directories(folder);
-	cv::FileStorage fs(folder + file, cv::FileStorage::WRITE);
-	fs << node << value;
+	bool end_of_class = true;
+	int steps = 0;
+	int i = 0;
+	cv::Mat respData;
+	responseData.convertTo(respData, CV_32F);
+	respData.push_back(-9999.00f);
+	cv::Mat trainData;
+	trainingData.convertTo(trainData, CV_32F);
+	cv::Mat sums(cv::Size(label_to_name.size(), trainingData.size().height), CV_32F, 0.0f);
+	cv::Mat averages(cv::Size(label_to_name.size(), trainingData.size().height), CV_32F, 0.0f);
+	for (int j = 0; j < label_to_name.size(); j++)
+	{
+		steps = i;
+		i = 0;
+		do
+		{
+			for (int k = 0; k < 256; k++)
+				sums.at<float>(k, j) = trainData.at<float>(k, i+steps) + sums.at<float>(k, j);
+
+			int tmp = responseData.at<int>(i+steps);
+			i++;
+			if (tmp == responseData.at<int>(i+steps)) end_of_class = false;
+			else end_of_class = true;
+		} while (!end_of_class);
+		for (int k = 0; k < 256; k++)
+			averages.at<float>(k, j) = sums.at<float>(k, j) * (1.0f/i);
+
+	}
+	cv::FileStorage fs(save_file, cv::FileStorage::WRITE);
+	fs << "average_hue_hists" << averages;
+	fs << "class_names" << label_to_name;
 	fs.release();
 }
 
+std::string classify_hue(const cv::Mat& hue_hist, std::string classifier_file)
+{
+	cv::Mat classifier;
+	std::vector<std::string> label_to_name;
+	cv::FileStorage fs(classifier_file, cv::FileStorage::READ);
+	fs["average_hue_hists"] >> classifier;
 
+	fs["class_names"] >> label_to_name;
+	fs.release();
+	int min_label = -1;
+	float min_out = 1000000;
+	std::vector<float> sum_sq_dist(label_to_name.size(), 0.0);
+	for (int i = 0; i < label_to_name.size(); i++)
+	{
+		for (int k = 0; k < 256; k++)
+		{
+
+			float tmp = hue_hist.at<float>(k) - classifier.at<float>(k, i);
+			sum_sq_dist[i] = sum_sq_dist[i] + tmp*tmp;
+
+		}
+		if (sum_sq_dist[i] < min_out)
+		{
+			min_out = sum_sq_dist[i];
+			min_label = i;
+		}
+	}
+	ROS_INFO("min out %f", min_out);
+	if (min_out < 30) return label_to_name[min_label];
+	else return "unknown";
+
+}

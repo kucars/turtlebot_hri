@@ -1,47 +1,50 @@
 /*
 
-Copyright 2015.
+Copyright 2015 Alaa El Khatib.
 
-    This file is part of the face_dr ROS package.
+This file is part of the face_dr ROS package.
 
-    face_dr is free software: you can redistribute it and/or modify
-    it under the terms of the Lesser GNU General Public License as published by
-    the Free Software Foundation, version 3.
+face_dr is free software: you can redistribute it and/or modify
+it under the terms of the Lesser GNU General Public License as published by
+the Free Software Foundation, version 3.
 
-    face_dr is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    Lesser GNU General Public License for more details.
+face_dr is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+Lesser GNU General Public License for more details.
 
-    You should have received a copy of the Lesser GNU General Public License
-    along with face_dr.  If not, see <http://www.gnu.org/licenses/>.
+You should have received a copy of the Lesser GNU General Public License
+along with face_dr.  If not, see <http://www.gnu.org/licenses/>.
 
+
+Face detection and recognition ROS actionlib server.
+Subscribes to: an /usb_cam/image_raw through an ImageTransport class.
 
 Author: Alaa El Khatib
-Last updated: 16.11.2015
+Last updated: 08.10.2015
 
 The code below is inspired by, builds upon, and/or uses code from the following source(s):
 
-   -face_recognition ROS package by Pouyan Ziafati, shared under a Creative Commons Attribution-NonCommercial 3.0 Unported license (http://creativecommons.org/licenses/by-nc/3.0/).
+-face_recognition ROS package by Pouyan Ziafati, shared under a Creative Commons Attribution-NonCommercial 3.0 Unported license (http://creativecommons.org/licenses/by-nc/3.0/).
 
-   -OpenCV's FaceReconizer tutorial (http://docs.opencv.org/modules/contrib/doc/facerec/facerec_tutorial.html) code by Philipp Wagner, shared under a BSD Simplified license (http://www.opensource.org/licenses/bsd-license). The license terms are reproduced below.
-   [*
-    * Copyright (c) 2011. Philipp Wagner <bytefish[at]gmx[dot]de>.
-    * Released to public domain under terms of the BSD Simplified license.
-    *
-    * Redistribution and use in source and binary forms, with or without
-    * modification, are permitted provided that the following conditions are met:
-    *   * Redistributions of source code must retain the above copyright
-    *     notice, this list of conditions and the following disclaimer.
-    *   * Redistributions in binary form must reproduce the above copyright
-    *     notice, this list of conditions and the following disclaimer in the
-    *     documentation and/or other materials provided with the distribution.
-    *   * Neither the name of the organization nor the names of its contributors
-    *     may be used to endorse or promote products derived from this software
-    *     without specific prior written permission.
-    *]
+-OpenCV's FaceReconizer tutorial (http://docs.opencv.org/modules/contrib/doc/facerec/facerec_tutorial.html) code by Philipp Wagner, shared under a BSD Simplified license (http://www.opensource.org/licenses/bsd-license). The license terms are reproduced below.
+[*
+* Copyright (c) 2011. Philipp Wagner <bytefish[at]gmx[dot]de>.
+* Released to public domain under terms of the BSD Simplified license.
+*
+* Redistribution and use in source and binary forms, with or without
+* modification, are permitted provided that the following conditions are met:
+*   * Redistributions of source code must retain the above copyright
+*     notice, this list of conditions and the following disclaimer.
+*   * Redistributions in binary form must reproduce the above copyright
+*     notice, this list of conditions and the following disclaimer in the
+*     documentation and/or other materials provided with the distribution.
+*   * Neither the name of the organization nor the names of its contributors
+*     may be used to endorse or promote products derived from this software
+*     without specific prior written permission.
+*]
 
-   -OpenCV's Histogram Calculation tutorial (http://docs.opencv.org/doc/tutorials/imgproc/histograms/histogram_calculation/histogram_calculation.html).
+-OpenCV's Histogram Calculation tutorial (http://docs.opencv.org/doc/tutorials/imgproc/histograms/histogram_calculation/histogram_calculation.html).
 
 */
 
@@ -56,8 +59,8 @@ The code below is inspired by, builds upon, and/or uses code from the following 
 FDRServer::FDRServer(std::string as_name, std::string cam_name, std::string standalone) :
 fdr_as(nh, as_name, false),
 img_transp(nh),
-rgb_sub(img_transp, cam_name + "/rgb/image_color", 1, image_transport::TransportHints("compressed")),
-depth_sub(img_transp, cam_name + "/depth_registered/image_raw", 1),
+rgb_sub(img_transp, cam_name + "/rgb/image_color", 2, image_transport::TransportHints("compressed")),
+depth_sub(img_transp, cam_name + "/depth_registered/image_raw", 2),
 sync(img_sync_policy(10), rgb_sub, depth_sub)
 {
 	fdr_as.registerGoalCallback(boost::bind(&FDRServer::goalCB, this));
@@ -311,6 +314,7 @@ void FDRServer::face_cb(const sensor_msgs::ImageConstPtr& rgb_img_ptr, const sen
 					fdr_feedback.result = "face";
 					fdr_feedback.depth = min_depth;
 					fdr_feedback.xmidpt = x_real;
+					fdr_feedback.img_time = img_time;
 					fdr_as.publishFeedback(fdr_feedback);
 					if (predicted_label >= 0)
 					{

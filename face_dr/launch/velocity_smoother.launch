@@ -1,0 +1,22 @@
+<!--
+  YOCS velocity smoother launcher
+  -->
+
+<launch>
+  <node pkg="nodelet" type="nodelet" name="smoother"
+        args="load yocs_velocity_smoother/VelocitySmootherNodelet /mobile_base_nodelet_manager">
+        
+    <rosparam file="$(find turtlebot_bringup)/param/defaults/smoother.yaml" command="load"/>
+
+    <remap from="smoother/smooth_cmd_vel" to="/cmd_vel_mux/input/navi"/>
+
+    <!-- Robot velocity feedbacks; use the default base configuration -->
+    <remap from="smoother/odometry" to="/odom"/>
+    <remap from="smoother/robot_cmd_vel" to="/mobile_base/commands/velocity"/>
+
+    <param name="accel_lim_v"  value="0.3"/>
+    <param name="accel_lim_w"  value="2.5"/>
+    <param name="decel_factor" value="1.0"/>
+  </node>
+
+</launch>
