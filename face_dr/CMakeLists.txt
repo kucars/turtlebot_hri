@@ -8,7 +8,7 @@ find_package(PCL)
 
 set(CMAKE_CXX_FLAGS "-std=c++0x ${CMAKE_CXX_FLAGS}")
 
- add_message_files(FILES fdr_msg.msg motion_msg.msg)
+ add_message_files(FILES fdr_msg.msg)
 
  add_action_files(DIRECTORY action FILES fdr.action)
 
