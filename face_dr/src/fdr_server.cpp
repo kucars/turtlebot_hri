@@ -2,19 +2,21 @@
 
 Copyright 2015.
 
-    This file is part of the face_dr ROS package.
+NOTICE: THIS FILE USES OPENCV'S NONFREE LIBRARIES (SURF) WHICH COULD HAVE A DIFFERENT LICENSE. CHECK BEFORE YOU USE!
 
-    face_dr is free software: you can redistribute it and/or modify
-    it under the terms of the Lesser GNU General Public License as published by
-    the Free Software Foundation, version 3.
+This file is part of the face_dr ROS package.
 
-    face_dr is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    Lesser GNU General Public License for more details.
+face_dr is free software: you can redistribute it and/or modify
+it under the terms of the Lesser GNU General Public License as published by
+the Free Software Foundation, version 3.
 
-    You should have received a copy of the Lesser GNU General Public License
-    along with face_dr.  If not, see <http://www.gnu.org/licenses/>.
+face_dr is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+Lesser GNU General Public License for more details.
+
+You should have received a copy of the Lesser GNU General Public License
+along with face_dr.  If not, see <http://www.gnu.org/licenses/>.
 
 
 Author: Alaa El Khatib
@@ -22,27 +24,28 @@ Last updated: 16.11.2015
 
 The code below is inspired by, builds upon, and/or uses code from the following source(s):
 
-   -face_recognition ROS package by Pouyan Ziafati, shared under a Creative Commons Attribution-NonCommercial 3.0 Unported license (http://creativecommons.org/licenses/by-nc/3.0/).
+-face_recognition ROS package by Pouyan Ziafati, shared under a Creative Commons Attribution-NonCommercial 3.0 Unported license (http://creativecommons.org/licenses/by-nc/3.0/).
 
-   -OpenCV's FaceReconizer tutorial (http://docs.opencv.org/modules/contrib/doc/facerec/facerec_tutorial.html) code by Philipp Wagner, shared under a BSD Simplified license (http://www.opensource.org/licenses/bsd-license). The license terms are reproduced below.
-   [*
-    * Copyright (c) 2011. Philipp Wagner <bytefish[at]gmx[dot]de>.
-    * Released to public domain under terms of the BSD Simplified license.
-    *
-    * Redistribution and use in source and binary forms, with or without
-    * modification, are permitted provided that the following conditions are met:
-    *   * Redistributions of source code must retain the above copyright
-    *     notice, this list of conditions and the following disclaimer.
-    *   * Redistributions in binary form must reproduce the above copyright
-    *     notice, this list of conditions and the following disclaimer in the
-    *     documentation and/or other materials provided with the distribution.
-    *   * Neither the name of the organization nor the names of its contributors
-    *     may be used to endorse or promote products derived from this software
-    *     without specific prior written permission.
-    *]
+-OpenCV's FaceReconizer tutorial (http://docs.opencv.org/modules/contrib/doc/facerec/facerec_tutorial.html) code by Philipp Wagner, shared under a BSD Simplified license (http://www.opensource.org/licenses/bsd-license). The license terms are reproduced below.
+[*
+* Copyright (c) 2011. Philipp Wagner <bytefish[at]gmx[dot]de>.
+* Released to public domain under terms of the BSD Simplified license.
+*
+* Redistribution and use in source and binary forms, with or without
+* modification, are permitted provided that the following conditions are met:
+*   * Redistributions of source code must retain the above copyright
+*     notice, this list of conditions and the following disclaimer.
+*   * Redistributions in binary form must reproduce the above copyright
+*     notice, this list of conditions and the following disclaimer in the
+*     documentation and/or other materials provided with the distribution.
+*   * Neither the name of the organization nor the names of its contributors
+*     may be used to endorse or promote products derived from this software
+*     without specific prior written permission.
+*]
 
-   -OpenCV's Histogram Calculation tutorial (http://docs.opencv.org/doc/tutorials/imgproc/histograms/histogram_calculation/histogram_calculation.html).
-
+-OpenCV's Histogram Calculation tutorial (http://docs.opencv.org/doc/tutorials/imgproc/histograms/histogram_calculation/histogram_calculation.html).
+-"Real Time Object Recognition using SURF" by Frank (https://github.com/doczhivago/rtObjectRecognition),
+	which relies on OpenCV's tutorial (http://docs.opencv.org/2.4/doc/tutorials/features2d/feature_homography/feature_homography.html).
 */
 
 
@@ -51,7 +54,10 @@ The code below is inspired by, builds upon, and/or uses code from the following 
 #include <boost/filesystem.hpp>
 #include <fstream>
 #include "opencv2/contrib/contrib.hpp"
-
+#include "opencv2/features2d/features2d.hpp"
+#include "opencv2/nonfree/features2d.hpp"
+#include "opencv2/nonfree/nonfree.hpp"
+#include "opencv2/calib3d/calib3d.hpp"
 
 FDRServer::FDRServer(std::string as_name, std::string cam_name, std::string standalone) :
 fdr_as(nh, as_name, false),
@@ -60,6 +66,7 @@ rgb_sub(img_transp, cam_name + "/rgb/image_color", 1, image_transport::Transport
 depth_sub(img_transp, cam_name + "/depth_registered/image_raw", 1),
 sync(img_sync_policy(10), rgb_sub, depth_sub)
 {
+
 	fdr_as.registerGoalCallback(boost::bind(&FDRServer::goalCB, this));
 	fdr_as.registerPreemptCallback(boost::bind(&FDRServer::preemptCB, this));
 	sync.registerCallback(boost::bind(&FDRServer::face_cb, this, _1, _2));
@@ -90,6 +97,7 @@ sync(img_sync_policy(10), rgb_sub, depth_sub)
 	else
 		STANDALONE = false;
 
+	//CHANGE THIS TO REFLECT YOUR MANUALLY CALCULATED TRANSFORM
 	if (STANDALONE)
 	{
 		tf::Transform transform_tmp;
@@ -97,9 +105,9 @@ sync(img_sync_policy(10), rgb_sub, depth_sub)
 		tf::Quaternion q;
 		q.setRPY(0, 0, 0.84);
 		transform_tmp.setRotation(q);
-		transform_sa = transform_tmp;//.inverse();
+		transform_sa = transform_tmp;
 	}
-	
+	cv::namedWindow("Object detection", CV_WINDOW_AUTOSIZE);
 }
 
 void FDRServer::goalCB()
@@ -116,9 +124,10 @@ void FDRServer::preemptCB()
 
 void FDRServer::face_cb(const sensor_msgs::ImageConstPtr& rgb_img_ptr, const sensor_msgs::ImageConstPtr& depth_img_ptr)
 {
+
 	if (!fdr_as.isActive())
 		return;
-		
+
 	if (fdr_goal->order == "DETECT_FACES_HAAR" ||
 		fdr_goal->order == "DETECT_FACES_LBP")
 	{
@@ -212,7 +221,7 @@ void FDRServer::face_cb(const sensor_msgs::ImageConstPtr& rgb_img_ptr, const sen
 		if (ub_rects.size() == 0 && detected_faces.size() == 0)
 		{
 			if (fdr_goal->order == "FIND_AND_FOLLOW_HAAR" ||
-				fdr_goal->order == "FIND_AND)_FOLLOW_LBP")
+				fdr_goal->order == "FIND_AND_FOLLOW_LBP")
 			{
 				std::string name_ext = fdr_goal->name + "/last_seen.yml";
 				boost::filesystem::path file_path(FACE_IMGS_FOLDER + name_ext);
@@ -283,7 +292,7 @@ void FDRServer::face_cb(const sensor_msgs::ImageConstPtr& rgb_img_ptr, const sen
 					x_real = -1 * (detected_faces[i].x + min_xy.x - (frame_width / 2))
 						* (min_depth / focal_length);
 				}
-				
+
 				if (predicted_label < 0)
 				{
 					unknown_fdepths.push_back(min_depth);
@@ -318,7 +327,7 @@ void FDRServer::face_cb(const sensor_msgs::ImageConstPtr& rgb_img_ptr, const sen
 						tf::Vector3 vec_sa = transform_sa(vec_tmp);
 						cv::Point2d tpt(vec_sa.x(), vec_sa.y());
 						std::string path_ext = label_to_name[predicted_label] + "/last_seen.yml";
-						write_yaml_2<double, cv::Point2d>(FACE_IMGS_FOLDER, path_ext, "time", ros::Time::now().toSec(), "location", tpt);
+						write_yaml_2<double, cv::Point2d>(FACE_IMGS_FOLDER, path_ext, "time", ros::WallTime::now().toSec(), "location", tpt);
 					}
 
 				}
@@ -393,7 +402,7 @@ void FDRServer::face_cb(const sensor_msgs::ImageConstPtr& rgb_img_ptr, const sen
 					x_real = -1 * (dc_rect.x + min_xy.x - (frame_width / 2))
 						* (min_depth / focal_length);
 				}
-				
+
 				if (ub_prediction == "unknown")
 				{
 					unknown_ubdepths.push_back(min_depth);
@@ -426,7 +435,7 @@ void FDRServer::face_cb(const sensor_msgs::ImageConstPtr& rgb_img_ptr, const sen
 						tf::Vector3 vec_sa = transform_sa(vec_tmp);
 						cv::Point2d tpt(vec_sa.x(), vec_sa.y());
 						std::string path_ext = ub_prediction + "/last_seen.yml";
-						write_yaml_2<double, cv::Point2d>(FACE_IMGS_FOLDER, path_ext, "time", ros::Time::now().toSec(), "location", tpt);
+						write_yaml_2<double, cv::Point2d>(FACE_IMGS_FOLDER, path_ext, "time", ros::WallTime::now().toSec(), "location", tpt);
 					}
 				}
 
@@ -483,16 +492,179 @@ void FDRServer::face_cb(const sensor_msgs::ImageConstPtr& rgb_img_ptr, const sen
 					fdr_as.publishFeedback(fdr_feedback);
 
 				}
-			}			
+			}
 		}
 
 		CBrate.sleep();
 	}
 
+	else if (fdr_goal->order == "FIND_OBJECT")
+	{
+
+		ros::Rate CBrate(2.0);
+		ros::Time img_time = rgb_img_ptr->header.stamp;
+		cv::Mat img = cv_bridge::toCvCopy(rgb_img_ptr, "mono8")->image;
+		cv::Mat depth_img = cv_bridge::toCvCopy(depth_img_ptr, "32FC1")->image;
+
+		cv::SurfFeatureDetector detector;
+		cv::SurfDescriptorExtractor extractor;
+		cv::Mat q_descriptors;
+		std::vector<cv::KeyPoint> q_keypoints;
+		std::vector<cv::Point2f> q_corners;
+
+		cv::Mat q_img = cv::imread(fdr_goal->name, CV_LOAD_IMAGE_GRAYSCALE);
+		if (!q_img.data)
+		{
+			ROS_INFO("error reading image");
+			return;
+		}
+		detector.detect(q_img, q_keypoints);
+		if (q_keypoints.size() < 2) return;
+		extractor.compute(q_img, q_keypoints, q_descriptors);
+
+
+		q_corners.push_back(cvPoint(0, 0));
+		q_corners.push_back(cvPoint(q_img.cols, 0));
+		q_corners.push_back(cvPoint(q_img.cols, q_img.rows));
+		q_corners.push_back(cvPoint(0, q_img.rows));
+
+		std::vector<cv::KeyPoint> keypoints;
+		cv::Mat descriptors;
+		detector.detect(img, keypoints);
+		if (keypoints.size() < 2) return;
+		extractor.compute(img, keypoints, descriptors);
+
+		cv::FlannBasedMatcher matcher;
+		float thresholdMatchingNN = 0.7;
+		unsigned int thresholdGoodMatches = 8;
+
+		std::vector< std::vector<cv::DMatch> > matches;
+
+		matcher.knnMatch(q_descriptors, descriptors, matches, 2);
+
+		std::vector<cv::DMatch> good_matches;
+
+		std::vector<cv::Point2f> obj;
+		std::vector<cv::Point2f> scene;
+		std::vector<cv::Point2f> scene_corners(4);
+		cv::Mat img_matches;
+
+
+		for (int i = 0; i < std::min(descriptors.rows - 1, (int)matches.size()); i++)
+		{
+			if (matches[i][0].distance < thresholdMatchingNN*(matches[i][1].distance) &&
+				(int)matches[i].size() <= 2 &&
+				(int)matches[i].size() > 0)
+			{
+				good_matches.push_back(matches[i][0]);
+			}
+		}
+
+		if (good_matches.size() < 3) return;
+
+		cv::drawMatches(q_img, q_keypoints, img, keypoints, good_matches, img_matches, cv::Scalar::all(-1), cv::Scalar::all(-1), std::vector<char>(), cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+
+		double min_depth = 0;
+		double xmidpt = 0;
+		bool OBJECT_FOUND = false;
+
+		if (good_matches.size() >= thresholdGoodMatches)
+		{
+			for (unsigned int i = 0; i < good_matches.size(); i++)
+			{
+				obj.push_back(q_keypoints[good_matches[i].queryIdx].pt);
+				scene.push_back(keypoints[good_matches[i].trainIdx].pt);
+			}
+
+			cv::Mat H = cv::findHomography(obj, scene, CV_RANSAC);
+
+			cv::perspectiveTransform(q_corners, scene_corners, H);
+
+			float ulx = std::max(scene_corners[0].x, scene_corners[3].x);
+			float uly = std::max(scene_corners[0].y, scene_corners[1].y);
+			float rwidth = std::min(scene_corners[1].x, scene_corners[2].x) - std::max(scene_corners[0].x, scene_corners[3].x);
+			float rheight = std::min(scene_corners[2].y, scene_corners[3].y) - std::max(scene_corners[0].y, scene_corners[1].y);
+
+			if (rwidth <= 0 || rheight <= 0 || ulx < 0 || uly < 0 ||
+				ulx + rwidth >= depth_img.size().width || uly + rheight >= depth_img.size().height)
+
+				return;
+
+			cv::Rect ROI(ulx, uly, rwidth, rheight);
+
+			cv::Mat obj_depth = depth_img(ROI);
+
+
+			if (cv::countNonZero(obj_depth) > 0.25 * obj_depth.size().area())
+			{
+				cv::Point min_xy;
+				cv::minMaxLoc(obj_depth, &min_depth, NULL, &min_xy, NULL, obj_depth != 0);
+				min_depth /= 1000;
+				xmidpt = -1 * (ROI.x + min_xy.x - (frame_width / 2))
+					* (min_depth / focal_length);
+				OBJECT_FOUND = true;
+			}
+		}
+		if (OBJECT_FOUND)
+		{
+			cv::putText(img_matches, "Object Found", cvPoint(10, 50), cv::FONT_HERSHEY_COMPLEX_SMALL, 2, cvScalar(0, 0, 250), 1, CV_AA);
+			cv::line(img_matches, scene_corners[0] + cv::Point2f(q_img.cols, 0), scene_corners[1] + cv::Point2f(q_img.cols, 0), cv::Scalar(0, 255, 0), 4);
+			cv::line(img_matches, scene_corners[1] + cv::Point2f(q_img.cols, 0), scene_corners[2] + cv::Point2f(q_img.cols, 0), cv::Scalar(0, 255, 0), 4);
+			cv::line(img_matches, scene_corners[2] + cv::Point2f(q_img.cols, 0), scene_corners[3] + cv::Point2f(q_img.cols, 0), cv::Scalar(0, 255, 0), 4);
+			cv::line(img_matches, scene_corners[3] + cv::Point2f(q_img.cols, 0), scene_corners[0] + cv::Point2f(q_img.cols, 0), cv::Scalar(0, 255, 0), 4);
+			tf::Vector3 vec_tmp(min_depth, xmidpt, 0.0);
+			tf::Vector3 vec;
+			if (!STANDALONE)
+			{
+				tf::StampedTransform transform;
+				try
+				{
+					listener.waitForTransform("/map", "/camera_rgb_frame", img_time, ros::Duration(1.0));
+					listener.lookupTransform("/map", "/camera_rgb_frame", img_time, transform);
+				}
+				catch (tf::TransformException ex)
+				{
+					ROS_ERROR("%s", ex.what());
+				}
+
+				vec = transform(vec_tmp);
+			}
+
+			else
+			{
+				vec = transform_sa(vec_tmp);
+			}
+
+			fdr_feedback.order = fdr_goal->order;
+			fdr_feedback.name = fdr_goal->name;
+			fdr_feedback.result = "SUCCESS";
+			fdr_feedback.xmidpt = vec.y();
+			fdr_feedback.depth = vec.x();
+			fdr_as.publishFeedback(fdr_feedback);
+		}
+		else
+		{
+			fdr_feedback.order = fdr_goal->order;
+			fdr_feedback.name = fdr_goal->name;
+			fdr_feedback.result = "FAIL";
+			fdr_feedback.xmidpt = 0;
+			fdr_feedback.depth = 0;
+			fdr_as.publishFeedback(fdr_feedback);
+
+			cv::putText(img_matches, "", cvPoint(10, 50), cv::FONT_HERSHEY_COMPLEX_SMALL, 3, cvScalar(0, 0, 250), 1, CV_AA);
+		}
+
+		cv::imshow("Object detection", img_matches);
+		cv::waitKey(1);
+		CBrate.sleep();
+
+	}
+
+
 	else
 	{
 		ROS_INFO("%s", (fdr_goal->order).c_str());
-		ROS_INFO("Unrecognized order. Use one of the following: 'DETECT_FACES_HAAR' or 'DETECT_FACES_LBP' or 'TRAIN_PCA' or 'RECOGNIZE_PCA_HAAR' or 'RECOGNIZE_PCA_LBP' or 'FIND_AND_FOLLOW_HAAR' or 'FIND_AND_FOLLOW_LBP'.");
+		ROS_INFO("Unrecognized order. Use one of the following: 'DETECT_FACES_HAAR' or 'DETECT_FACES_LBP' or 'TRAIN_PCA' or 'RECOGNIZE_PCA_HAAR' or 'RECOGNIZE_PCA_LBP' or 'FIND_AND_FOLLOW_HAAR' or 'FIND_AND_FOLLOW_LBP' or 'FIND_OBJECT'.");
 		preemptCB();
 	}
 }

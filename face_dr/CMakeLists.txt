@@ -30,7 +30,7 @@ include_directories(
 )
 
 add_library(face_dr_lib src/fdr_utilities.cpp src/fdr_server.cpp src/fdr_client.cpp)
-target_link_libraries(face_dr_lib ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+target_link_libraries(face_dr_lib ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} opencv_nonfree)
 add_dependencies(face_dr_lib face_dr_generate_messages_cpp)
 
 add_executable(fdr_client src/fdr_client_node.cpp)

@@ -18,12 +18,14 @@ Copyright 2015.
 
 
 Author: Alaa El Khatib
-Last updated: 16.11.2015
+Last updated: 24.11.2015
 
 The code below is inspired by, builds upon, and/or uses code from the following source(s):
 
 	-face_recognition ROS package by Pouyan Ziafati, shared under a Creative Commons Attribution 3.0 license.
 	-ROS turtlebot_follower package.
+	-sound_play ROS package
+
 
 */
 
@@ -47,8 +49,8 @@ FDRClient::FDRClient(std::string s_name, std::string sub_name, std::string stand
 	vel_pub = nh.advertise<geometry_msgs::Twist>("/raw_cmd_vel", 1, true);
 	move_goal_id = 0;
 	NEW_GOAL = true;
-	time_cloud = ros::Time::now();
-	time_checked = ros::Time::now().toSec();
+	time_cloud = ros::WallTime::now();
+	time_checked = ros::WallTime::now().toSec();
 }
 
 void FDRClient::face_active_cb()
@@ -88,7 +90,7 @@ void FDRClient::face_feedback_cb(FDR_ACTION_FEEDBACK_Ptr feedback)
 	else if (feedback->order == "FIND_AND_FOLLOW_HAAR" || feedback->order == "FIND_AND_FOLLOW_LBP")
 	{
 		boost::lock_guard<boost::mutex> guard(mtx_);
-		
+
 		if (!FOUND && (feedback->result == "FAIL" || (feedback->result == "STORED" && feedback->time_seen < time_checked)))
 		{
 			if (NEW_GOAL)
@@ -109,9 +111,10 @@ void FDRClient::face_feedback_cb(FDR_ACTION_FEEDBACK_Ptr feedback)
 			FOUND = true;
 			REACHED = false;
 			LATCHED = false;
-			if (!NEW_GOAL)
-				fdr_mc.cancelAllGoals();
 			
+			if (!NEW_GOAL)
+				fdr_mc.cancelGoalsAtAndBeforeTime(ros::Time::now());
+				 	
 			ROS_INFO("%s is found at map coordinates (%f, %f)", last_name.c_str(), feedback->depth, feedback->xmidpt);
 			move_goal.target_pose.pose.position.x = feedback->depth;
 			move_goal.target_pose.pose.position.y = feedback->xmidpt;
@@ -120,21 +123,23 @@ void FDRClient::face_feedback_cb(FDR_ACTION_FEEDBACK_Ptr feedback)
 			move_goal.target_pose.pose.orientation = tf::createQuaternionMsgFromYaw(M_PI);
 			ROS_INFO("Sending move goal to target location");
 			fdr_mc.sendGoal(move_goal, boost::bind(&FDRClient::move_result_cb, this, _1, _2));
-			time_found = ros::Time::now();
-			std::string speech_msg = "I found you " + last_name + ". I'll be there in a second.";
-            say_stuff.say(speech_msg);
-
+			time_found = ros::WallTime::now();
+			if (feedback->result == "STORED")
+			{
+				std::string speech_msg = "I found you " + last_name + ". I'll be there in a second.";
+            	say_stuff.say(speech_msg);	
+			}
 		}
 		
 		else if (FOUND && !REACHED)
 		{
-			if (ros::Time::now() - time_found > ros::Duration(40))
+			if (ros::WallTime::now() - time_found > ros::WallDuration(40))
 			{
 				ROS_INFO("Could not reach target location within 40 seconds");
 				ROS_INFO("Resuming search path");
 				FOUND = false;
 				NEW_GOAL = true;
-				time_checked = ros::Time::now().toSec();
+				time_checked = ros::WallTime::now().toSec();
 
 			}
 		}
@@ -142,7 +147,7 @@ void FDRClient::face_feedback_cb(FDR_ACTION_FEEDBACK_Ptr feedback)
 		else if (REACHED && (feedback->result == "FAIL" || (feedback->result == "STORED" && feedback->time_seen < time_checked)) && !LATCHED) //checking for LATCHED should not be needed, but just in case a new feedback is available before server preempt
 		{
 
-			if (ros::Time::now() - time_reached > ros::Duration(30))
+			if (ros::WallTime::now() - time_reached > ros::WallDuration(40))
 			{
 				ROS_INFO("%s does not appear to be at expected location", last_name.c_str());
 				ROS_INFO("Resuming search path");
@@ -153,7 +158,7 @@ void FDRClient::face_feedback_cb(FDR_ACTION_FEEDBACK_Ptr feedback)
 			else
 			{
 				vel_msg.linear.x = 0;
-				vel_msg.angular.z = 0.7;
+				vel_msg.angular.z = 0.5;
 				vel_pub.publish(vel_msg);
 			}
 		}
@@ -165,13 +170,22 @@ void FDRClient::face_feedback_cb(FDR_ACTION_FEEDBACK_Ptr feedback)
 			vel_msg.angular.y = 0;
 			vel_pub.publish(vel_msg);
 			LATCHED = true;
-			fdr_ac.cancelAllGoals();
+			fdr_ac.cancelGoalsAtAndBeforeTime(ros::Time::now());
 			cloud_sub = nh.subscribe<PointCloud>("/facecamera/depth_registered/points", 1, &FDRClient::cloud_cb, this);
 			std::string speech_msg = "Hello " + last_name + ". How can I help you?";
             say_stuff.say(speech_msg);
 			
 		}
 		
+	}
+
+
+	else if (feedback->order == "FIND_OBJECT")
+	{
+		if (feedback->result == "SUCCESS")
+			ROS_INFO("object was found at map coordinates (%f, %f)", feedback->depth, feedback->xmidpt);
+		else
+			; //do nothing
 	}
 }
 
@@ -190,7 +204,7 @@ void FDRClient::move_result_cb(AC_GOAL_STATE state, MOVE_RESULT_Ptr result)
 	{
 		ROS_INFO("Target location reached");
 		REACHED = true;
-		time_reached = ros::Time::now();
+		time_reached = ros::WallTime::now();
 		time_checked = time_reached.toSec();
 	}
 	
@@ -224,16 +238,25 @@ void FDRClient::cloud_cb(const PointCloud::ConstPtr& cloud)
 		{
 			x /= n;
 			y /= n;
-			vel_msg.linear.x = (z - goal_z) * 1.5;
-			vel_msg.angular.z = -1 * x * 3.0;
+			if (fabs(z - goal_z) > 0.1)
+			{
+				vel_msg.linear.x = (z - goal_z) * 1;
+			}
+
+			else
+			{
+				vel_msg.linear.x = 0;	
+			}
+
+			vel_msg.angular.z = -1 * x * 2.3;
 			vel_pub.publish(vel_msg);
-			time_cloud = ros::Time::now();
+			time_cloud = ros::WallTime::now();
 		}
 		else
 		{
 			ROS_INFO("Not enough points within point cloud range");
 			ROS_INFO("Waiting for more...");
-			if (ros::Time::now() - time_cloud > ros::Duration(10.0))
+			if (ros::WallTime::now() - time_cloud > ros::WallDuration(10.0))
 			{
 				
 				std::string speech_msg = "Oh, it seems I have lost you, " + last_name + ". I'll try to find you again.";
@@ -241,7 +264,7 @@ void FDRClient::cloud_cb(const PointCloud::ConstPtr& cloud)
 				FOUND = true;
 				REACHED = true;
 				LATCHED = false;
-				time_reached = ros::Time::now();
+				time_reached = ros::WallTime::now();
 				face_goal.order = last_order;
 				face_goal.name = last_name;
 				face_goal.num_of_samples = 0;
