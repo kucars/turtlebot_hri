@@ -153,7 +153,7 @@ There is a minimum number of people in the dress color database that have to be 
 
         if (label_to_ub_name.size() > 1)
         
-in fdr_server.cpp (around line 348) and change the limit. Currently the minimum number is 2. Remember to rebuild the workspace whenever you the source code!
+in fdr_server.cpp (around line 348) and change the limit. Currently the minimum number is 2. Remember to rebuild the workspace whenever you change the source code!
 
 
 Object recognition:
@@ -162,4 +162,4 @@ To recognize objects (using SURF), you need a sample image of the target object:
 
         rostopic pub -1 /fdrOrder1 face_dr/fdr_msg "FIND_OBJECT" "/path/to/img.jpg" 0
 
-Note: Object recognition does not work well from afar. Also, if you alternate between orders, you may need to rerun the server/client every now and then. You can definitely fix that in code if you have the time!
+Note: Object recognition does not work well from afar. Also, if you alternate between orders (FIND_OBJECT, FIND_AND_FOLLOW_HAAR, etc.), you may need to rerun the server/client every now and then. You can definitely fix that in code if you have the time!
