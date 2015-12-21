@@ -55,7 +55,7 @@ First a few details need to be edited in the code.
 
 -Open the fdr_server.h file, and choose the ROS_DATA file path as you want it, and make sure you create the file tree shown yourself (i.e., go to these destinations and create the folders with the correct names).
 
--Find OpenCV’s cascade classifier files (the ones used in named in the file tree) and copy them to the designated destination.
+-Find OpenCV’s cascade classifier files (the ones named in the file tree) and copy them to the designated destination.
 
 -When you run the face recognition using your dataset, the PCA FaceRecognizer threshold of OpenCV’s implementation may not be suitable for you, and you will probably need to tune it to get a satisfactory recognition accuracy. That threshold is in fdr_server.h (called PCA_THRESH).
 
@@ -75,7 +75,7 @@ First a few details need to be edited in the code.
 
 On the Turtlebot laptop (SSH from workstation):
 
-        roslaunch turtebot_bringup minimal.launch
+        roslaunch turtlebot_bringup minimal.launch
 
 
 (Use your map file.)
@@ -108,7 +108,7 @@ On the Turtlebot laptop (SSH from workstation):
 
 (Choose the corresponding server name and topic name. “false”/“true” here refer to whether the camera is a standalone camera. The velocity commands topic is mapped to the navigation smoother, which should be there if you ran the acml_demo. This client should be run on the laptop to which the camera is connected, because it uses the point cloud to follow people, and if it is not run locally, it will be too slow to work.)
 
-        rosrun face_dr fdr_client "turtleServer" "/fdrOrder1" "false" … /raw_cmd_vel:=/navigation_velocity_smoother/raw_cmd_vel __name:=turtleClient
+        rosrun face_dr fdr_client "turtleServer" "/fdrOrder1" "false" /raw_cmd_vel:=/navigation_velocity_smoother/raw_cmd_vel __name:=turtleClient
 
 
 (This runs the node that plays the stuff the robot says. The sentences are synthesized in the client node. Make sure you have the sound_play package.)
