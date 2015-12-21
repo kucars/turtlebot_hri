@@ -201,7 +201,5 @@ To recognize objects (using SURF), you need a sample image of the target object:
 
     rostopic pub -1 /fdrOrder1 face_dr/fdr_msg "FIND_OBJECT" "/path/to/img.jpg" 0
 
-    rostopic pub -1 /fdrOrder1 face_dr/fdr_msg "FIND_OBJECT" "/path/to/img.jpg" 0
-
 
 Note: Object recognition does not work well from afar. Also, if you alternate between orders, you may need to rerun the server/client every now and then. You can definitely fix that in code if you have the time!
